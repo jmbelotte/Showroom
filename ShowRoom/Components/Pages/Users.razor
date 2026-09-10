@@ -1,0 +1,122 @@
+@page "/users"
+@rendermode InteractiveServer
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>Users</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Users</h1>
+    <a class="btn btn-primary" href="users/add">Add user</a>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_result is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_result.TotalCount == 0)
+{
+    <p>No users yet. <a href="users/add">Add the first user</a>.</p>
+}
+else
+{
+    <p class="text-muted">
+        Showing @_result.Items.Count of @_result.TotalCount users
+        — page @_result.Page / @_result.TotalPages
+    </p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>First name</th>
+                <th>Last name</th>
+                <th>Email</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in _result.Items)
+            {
+                <tr>
+                    <td>@user.first_name</td>
+                    <td>@user.last_name</td>
+                    <td>@user.email</td>
+                    <td>@user.date_created.ToLocalTime().ToString("g")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_result.TotalPages > 1)
+    {
+        <nav aria-label="User pagination">
+            <ul class="pagination">
+                <li class="page-item @(_result.Page <= 1 ? "disabled" : null)">
+                    <button class="page-link" disabled="@(_result.Page <= 1)" @onclick="() => GoToPage(_result.Page - 1)">Previous</button>
+                </li>
+                @foreach (var pageNumber in VisiblePages())
+                {
+                    <li class="page-item @(pageNumber == _result.Page ? "active" : null)">
+                        <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                    </li>
+                }
+                <li class="page-item @(_result.Page >= _result.TotalPages ? "disabled" : null)">
+                    <button class="page-link" disabled="@(_result.Page >= _result.TotalPages)" @onclick="() => GoToPage(_result.Page + 1)">Next</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private PagedResult<User>? _result;
+    private string? _error;
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _error = null;
+        try
+        {
+            _result = await UserService.GetPagedAsync(Page < 1 ? 1 : Page);
+        }
+        catch (Exception)
+        {
+            _result = null;
+            _error = "Unable to load users. Check that PostgreSQL is running and the connection string is valid.";
+        }
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        Navigation.NavigateTo($"/users?page={page}");
+    }
+
+    private IEnumerable<int> VisiblePages()
+    {
+        if (_result is null || _result.TotalPages <= 0)
+        {
+            yield break;
+        }
+
+        var start = Math.Max(1, _result.Page - 2);
+        var end = Math.Min(_result.TotalPages, start + 4);
+        start = Math.Max(1, end - 4);
+
+        for (var page = start; page <= end; page++)
+        {
+            yield return page;
+        }
+    }
+}

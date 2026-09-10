@@ -1,0 +1,92 @@
+@page "/users/add"
+@rendermode InteractiveServer
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>Add user</PageTitle>
+
+<h1>Add user</h1>
+
+<p><a href="users">Back to users</a></p>
+
+@if (!string.IsNullOrEmpty(_formError))
+{
+    <div class="alert alert-danger">@_formError</div>
+}
+
+<EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="add-user">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+
+    <div class="mb-3">
+        <label class="form-label" for="first-name">First name</label>
+        <InputText id="first-name" class="form-control" @bind-Value="_model.FirstName" />
+        <ValidationMessage For="() => _model.FirstName" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="last-name">Last name</label>
+        <InputText id="last-name" class="form-control" @bind-Value="_model.LastName" />
+        <ValidationMessage For="() => _model.LastName" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+        <ValidationMessage For="() => _model.Email" />
+    </div>
+
+    <button class="btn btn-primary" type="submit" disabled="@_saving">
+        @(_saving ? "Saving..." : "Save")
+    </button>
+</EditForm>
+
+@code {
+    private readonly CreateUserModel _model = new();
+    private string? _formError;
+    private bool _saving;
+
+    private async Task SubmitAsync()
+    {
+        _formError = null;
+        _saving = true;
+
+        try
+        {
+            await UserService.CreateAsync(_model.FirstName, _model.LastName, _model.Email);
+            Navigation.NavigateTo("/users");
+        }
+        catch (Application.Exceptions.ValidationException ex)
+        {
+            _formError = string.Join(" ", ex.Errors.SelectMany(pair => pair.Value));
+        }
+        catch (DuplicateEmailException ex)
+        {
+            _formError = ex.Message;
+        }
+        catch (Exception)
+        {
+            _formError = "Unable to save the user. Check that PostgreSQL is running and the connection string is valid.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class CreateUserModel
+    {
+        [Required]
+        [MaxLength(100)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        [MaxLength(256)]
+        public string Email { get; set; } = string.Empty;
+    }
+}

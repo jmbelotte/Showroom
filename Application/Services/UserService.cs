@@ -16,14 +16,15 @@ namespace Application.Services
             _users = users;
         }
 
-        public Task<PagedResult<User>> GetPagedAsync(int page, CancellationToken cancellationToken = default)
+        public Task<PagedResult<User>> GetPagedAsync(int page, string? search = null, CancellationToken cancellationToken = default)
         {
             if (page < 1)
             {
                 page = 1;
             }
 
-            return _users.GetPagedAsync(page, PageSize, cancellationToken);
+            var term = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            return _users.GetPagedAsync(page, PageSize, term, cancellationToken);
         }
 
         public async Task<User> CreateAsync(string firstName, string lastName, string email, CancellationToken cancellationToken = default)

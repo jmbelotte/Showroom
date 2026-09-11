@@ -10,6 +10,26 @@
     <a class="btn btn-primary" href="users/add">Add user</a>
 </div>
 
+<form class="row g-2 mb-3" @onsubmit="ApplySearch" @onsubmit:preventDefault>
+    <div class="col-md-6">
+        <label class="visually-hidden" for="user-search">Search users</label>
+        <input id="user-search"
+               class="form-control"
+               placeholder="Search by name or email"
+               @bind="_searchInput"
+               @bind:event="oninput" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Search</button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Q))
+    {
+        <div class="col-auto">
+            <button type="button" class="btn btn-link" @onclick="ClearSearch">Clear</button>
+        </div>
+    }
+</form>
+
 @if (!string.IsNullOrEmpty(_error))
 {
     <div class="alert alert-danger">@_error</div>
@@ -18,15 +38,23 @@ else if (_result is null)
 {
     <p><em>Loading...</em></p>
 }
-else if (_result.TotalCount == 0)
+else if (_result.TotalCount == 0 && string.IsNullOrWhiteSpace(Q))
 {
     <p>No users yet. <a href="users/add">Add the first user</a>.</p>
+}
+else if (_result.TotalCount == 0)
+{
+    <p>No users match “@Q”.</p>
 }
 else
 {
     <p class="text-muted">
         Showing @_result.Items.Count of @_result.TotalCount users
         — page @_result.Page / @_result.TotalPages
+        @if (!string.IsNullOrWhiteSpace(Q))
+        {
+            <span> for “@Q”</span>
+        }
     </p>
 
     <table class="table table-striped">
@@ -75,16 +103,21 @@ else
 @code {
     private PagedResult<User>? _result;
     private string? _error;
+    private string _searchInput = string.Empty;
 
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Q { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
+        _searchInput = Q ?? string.Empty;
         _error = null;
         try
         {
-            _result = await UserService.GetPagedAsync(Page < 1 ? 1 : Page);
+            _result = await UserService.GetPagedAsync(Page < 1 ? 1 : Page, Q);
         }
         catch (Exception)
         {
@@ -93,14 +126,40 @@ else
         }
     }
 
+    private void ApplySearch()
+    {
+        Navigate(1, _searchInput);
+    }
+
+    private void ClearSearch()
+    {
+        Navigate(1, null);
+    }
+
     private void GoToPage(int page)
+    {
+        Navigate(page, Q);
+    }
+
+    private void Navigate(int page, string? search)
     {
         if (page < 1)
         {
             page = 1;
         }
 
-        Navigation.NavigateTo($"/users?page={page}");
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            parts.Add($"q={Uri.EscapeDataString(search.Trim())}");
+        }
+
+        if (page > 1)
+        {
+            parts.Add($"page={page}");
+        }
+
+        Navigation.NavigateTo(parts.Count == 0 ? "/users" : $"/users?{string.Join("&", parts)}");
     }
 
     private IEnumerable<int> VisiblePages()

@@ -8,10 +8,23 @@ public sealed class InMemoryUserRepository : IUserRepository
 {
     private readonly List<User> _users = [];
 
-    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, string? search = null, CancellationToken cancellationToken = default)
     {
-        var items = _users
+        IEnumerable<User> filtered = _users;
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filtered = _users.Where(user =>
+                user.first_name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                user.last_name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                user.email.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var matched = filtered
             .OrderByDescending(user => user.date_created)
+            .ToList();
+
+        var items = matched
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
@@ -19,7 +32,7 @@ public sealed class InMemoryUserRepository : IUserRepository
         return Task.FromResult(new PagedResult<User>
         {
             Items = items,
-            TotalCount = _users.Count,
+            TotalCount = matched.Count,
             Page = page,
             PageSize = pageSize
         });

@@ -57,4 +57,19 @@ public class UserServiceTests
         Assert.Equal(2, page1.TotalPages);
         Assert.Equal(5, page2.Items.Count);
     }
+
+    [Fact]
+    public async Task GetPagedAsync_WhenSearchMatchesOneUser_ReturnsOnlyThatUser()
+    {
+        var repository = new InMemoryUserRepository();
+        var service = new UserService(repository);
+
+        await service.CreateAsync("Ada", "Lovelace", "ada@showroom.local");
+        await service.CreateAsync("Grace", "Hopper", "grace@showroom.local");
+
+        var result = await service.GetPagedAsync(1, "ADA");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("ada@showroom.local", Assert.Single(result.Items).email);
+    }
 }
